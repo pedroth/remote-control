@@ -1,17 +1,13 @@
 # remote-control
 
-To install dependencies:
+## Description
 
-```bash
-bun install
-```
+Remote control your computer using remote-control server, through a web interface on your phone or another computer. It uses webRTC for connection with the server on the controlled computer. The motivation for this project was to control my Raspberry PI, connected to my tv, using my phone.
 
-To run:
+## Usage
 
-```bash
-bun run 
-```
+- Download executable from [releases]().
+- Run the executable on the computer you want to control.
 
-This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
 
 

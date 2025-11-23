@@ -7,6 +7,7 @@ import open from 'open';
 import ip from 'ip';
 import path from 'path';
 import robot from '@jitsi/robotjs';
+import { cwd } from "process";
 
 const app = express();
 
@@ -22,7 +23,11 @@ const io = new Server(httpsServer);
 
 const PORT = 3000;
 const LOCAL_IP = ip.address();
-const PUBLIC_DIR = path.join(import.meta.dir, 'public');
+
+
+// Get current file directory in any environment
+const __dirname = cwd();
+const PUBLIC_DIR = path.join(__dirname, 'public');
 
 app.use(express.static(PUBLIC_DIR));
 
@@ -53,6 +58,14 @@ io.on('connection', (socket) => {
         try { robot.mouseClick(btn); } catch (e) { }
     });
 
+    socket.on('cmd_mouse_down', (btn) => {
+        try { robot.mouseToggle('down', btn); } catch (e) { }
+    });
+
+    socket.on('cmd_mouse_up', (btn) => {
+        try { robot.mouseToggle('up', btn); } catch (e) { }
+    });
+
     socket.on('cmd_type', (text) => {
         try { robot.typeString(text); robot.keyTap("enter"); } catch (e) { }
     });
@@ -72,4 +85,6 @@ httpsServer.listen(PORT, () => {
     console.log(`Address: https://${LOCAL_IP}:${PORT}/qr.html`);
     console.log(`Note: You will still see a 'Not Secure' warning in the browser.`);
     console.log(`      Click 'Advanced' -> 'Proceed' to allow the Camera.`);
+    // launch browser automatically
+    open(`https://${LOCAL_IP}:${PORT}/qr.html`);
 });

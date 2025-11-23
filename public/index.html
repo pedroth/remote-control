@@ -9,7 +9,9 @@
 </head>
 
 <body>
-
+    <!-- Eruda Debug Console -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
     <script type="module">
         // 1. IMPORTS
         import DomBuilder from "./domBuilder.js";
@@ -63,23 +65,19 @@
                 ),
 
                 // Trackpad
-                DomBuilder.of("div").attr("id", "trackpad").append(
-                    DomBuilder.of("span").inner(`
-                    Touch Area\n\n
-                    1-Finger Move: Move Mouse\n
-                    1-Finger Double Tap: Left Click\n
-                    2-Finger Tap: Right Click\n
-                    2-Finger Move: Scroll\n
-                    `)
-                ),
-
-                // Mouse Buttons
-                DomBuilder.of("div").addClass("mouse-btns").append(
-                    DomBuilder.of("button").addClass("btn-large").inner("L-Click")
-                        .event("click", () => sendClick('left')),
-                    DomBuilder.of("button").addClass("btn-large").inner("R-Click")
-                        .event("click", () => sendClick('right'))
-                ),
+                DomBuilder.of("div")
+                    .attr("id", "trackpad")
+                    .append(
+                        DomBuilder
+                            .of("span")
+                            .inner(`Touch Area`)
+                    ),
+                DomBuilder.of("div").addClass("info-text").inner(`
+                    1-Finger Move: Move Mouse<br>
+                    1-Finger Double Tap: Left Click<br>
+                    2-Finger Tap: Right Click<br>
+                    2-Finger Move: Scroll
+                `),
 
                 // Keyboard Group
                 DomBuilder.of("div").addClass("input-group").append(
@@ -134,88 +132,106 @@
             }
         }
 
+        // not used, kept for reference
         function sendClick(btn) {
             socket.emit('cmd_mouse_click', btn);
         }
 
         // --- 5. TRACKPAD EVENT LISTENERS ---
-        const padElement = document.getElementById('trackpad');
+        const padElement = document.getElementById("trackpad");
 
         let lastX = 0, lastY = 0;
-        let lastTapTime = 0;
+        let singleTapTime = 0;
+        let isDragging = false;
         let isTwoFinger = false;
+        let isScrolling = false;
 
         // Touch Start
-        padElement.addEventListener('touchstart', (e) => {
+        padElement.addEventListener("touchstart", (e) => {
             e.preventDefault();
 
             const touches = e.touches.length;
 
-            // Detect two-finger gesture
-            isTwoFinger = touches === 2;
-
+            // --- 1-FINGER DOUBLE TAP HOLD → DRAG ---
             if (touches === 1) {
                 const now = Date.now();
-                if (now - lastTapTime < 300) {
-                    // DOUBLE TAP → LEFT CLICK
-                    socket.emit('cmd_mouse_click', 'left');
+                if (now - singleTapTime < 300) {
+                    // Double tap detected: begin drag
+                    socket.emit("cmd_mouse_down", "left");
+                    isDragging = true;
                 }
-                lastTapTime = now;
-            }
-            else if (touches === 2) {
-                // Two-finger TAP (short duration) → RIGHT CLICK
-                lastTapTime = Date.now();
+                singleTapTime = now;
             }
 
-            const touch = e.touches[0];
-            lastX = touch.clientX;
-            lastY = touch.clientY;
+            // --- 2-FINGER TAP / SCROLL DETECTION ---
+            if (touches === 2) {
+                isTwoFinger = true;
+            }
+
+            const t = e.touches[0];
+            lastX = t.clientX;
+            lastY = t.clientY;
         }, { passive: false });
 
 
         // Touch Move
-        padElement.addEventListener('touchmove', (e) => {
+        padElement.addEventListener("touchmove", (e) => {
             e.preventDefault();
 
             const touches = e.touches.length;
 
+            // --- 2-FINGER SCROLL ---
+            if (touches === 2) {
+                const t = e.touches[0];
+                const dy = t.clientY - lastY;
+
+                eruda.get('console').log('SCROLL DETECTED', dy);
+                if(dy === 0) return; // No movement
+
+                socket.emit("cmd_scroll", { amount: dy });
+
+                lastY = t.clientY;
+                isScrolling = true;
+                return;
+            }
+
+            // --- 1-FINGER MOVE ---
             if (touches === 1 && !isTwoFinger) {
-                // Normal mouse move
                 const t = e.touches[0];
                 const dx = t.clientX - lastX;
                 const dy = t.clientY - lastY;
 
-                socket.emit('cmd_mouse_move', { x: dx, y: dy });
+                socket.emit("cmd_mouse_move", { x: dx, y: dy });
 
                 lastX = t.clientX;
                 lastY = t.clientY;
             }
-            else if (touches === 2) {
-                // Two-finger scroll
-                const t = e.touches[0];
-                const dy = t.clientY - lastY;
-
-                socket.emit('cmd_scroll', { amount: dy });
-
-                lastY = t.clientY;
-            }
         }, { passive: false });
 
 
-        // Touch End → detect two-finger tap for right-click
-        padElement.addEventListener('touchend', (e) => {
-            const touches = e.touches.length;
+        // Touch End
+        padElement.addEventListener("touchend", (e) => {
+            const touchesLeft = e.touches.length;
 
-            if (!isTwoFinger) return;
+            // --- END DRAG ---
+            if (isDragging && touchesLeft === 0) {
+                socket.emit("cmd_mouse_up", "left");
+                isDragging = false;
+                return;
+            }
 
-            const now = Date.now();
-            if (now - lastTapTime < 250) {
-                // Two-finger quick tap → RIGHT CLICK
-                socket.emit('cmd_mouse_click', 'right');
+            eruda.get('console').log('ATTEMPT RIGHT CLICK CHECK', isTwoFinger, touchesLeft, isScrolling);
+            // --- 2-FINGER TAP → RIGHT CLICK ---
+            if (isTwoFinger && touchesLeft === 1 && !isScrolling) {
+                eruda.get('console').log('RIGHT CLICK: two-finger tap detected');
+                socket.emit("cmd_mouse_click", "right");
             }
 
             isTwoFinger = false;
+            isScrolling = false;
         }, { passive: false });
+
+
     </script>
 </body>
 

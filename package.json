@@ -1,8 +1,12 @@
 {
   "name": "remote-control",
   "private": true,
+  "scripts": {
+    "build-windows": "bun build --compile --target=bun-windows-x64 ./server.mjs --outfile remote-control-server.exe",
+    "build-linux": "bun build --compile --target=bun-linux-x64 ./server.mjs --outfile remote-control-server"
+  },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
