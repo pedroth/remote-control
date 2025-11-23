@@ -1,6 +1,6 @@
 import express from 'express';
 // 1. Import HTTPS and FileSystem (fs)
-import { createServer } from 'https'; 
+import { createServer } from 'https';
 import { readFileSync } from 'fs';
 import { Server } from 'socket.io';
 import open from 'open';
@@ -28,8 +28,8 @@ app.use(express.static(PUBLIC_DIR));
 
 app.get('/config', (req, res) => {
     // 4. Update protocol to HTTPS
-    res.json({ 
-        hostUrl: `https://${LOCAL_IP}:${PORT}/index.html` 
+    res.json({
+        hostUrl: `https://${LOCAL_IP}:${PORT}/index.html`
     });
 });
 
@@ -44,18 +44,26 @@ io.on('connection', (socket) => {
     socket.on('cmd_mouse_move', (data) => {
         try {
             const mouse = robot.getMousePos();
-            const speed = 2.0; 
+            const speed = 2.0;
             robot.moveMouse(mouse.x + (data.x * speed), mouse.y + (data.y * speed));
-        } catch (e) {}
+        } catch (e) { }
     });
 
     socket.on('cmd_mouse_click', (btn) => {
-        try { robot.mouseClick(btn); } catch (e) {}
+        try { robot.mouseClick(btn); } catch (e) { }
     });
 
     socket.on('cmd_type', (text) => {
-        try { robot.typeString(text); robot.keyTap("enter"); } catch (e) {}
+        try { robot.typeString(text); robot.keyTap("enter"); } catch (e) { }
     });
+
+    socket.on('cmd_scroll', (data) => {
+        try {
+            const speed = 1;
+            robot.scrollMouse(0, data.amount * speed);
+        } catch (e) { }
+    });
+
 });
 
 // 5. Listen using the httpsServer

@@ -1,80 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Controller</title>
     <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
+
 <body>
-    <div id="scan-section">
-        <h2>Scan Server QR</h2>
-        <div id="reader" style="width: 300px; margin: 0 auto;"></div>
-        <button onclick="startControl()" style="margin-top:20px;">Skip / Connected</button>
-    </div>
 
-    <div id="control-section" class="hidden">
-        <div class="status-bar">Connected via Bun 🚀</div>
-        
-        <div class="input-group">
-            <input type="text" id="urlInput" placeholder="google.com">
-            <button onclick="sendGoto()">Go</button>
-        </div>
+    <script type="module">
+        // 1. IMPORTS
+        import DomBuilder from "./domBuilder.js";
 
-        <div id="trackpad"><span>Touch Area</span></div>
+        // Socket.io (ESM version)
+        import { io } from "./socket.js";
 
-        <div class="mouse-btns">
-            <button class="btn-large" onclick="sendClick('left')">L-Click</button>
-            <button class="btn-large" onclick="sendClick('right')">R-Click</button>
-        </div>
+        // --- THE FIX IS HERE ---
+        // We use esm.sh which wraps the library in a compatible module format
+        import { Html5QrcodeScanner as qrScanner } from "./qrScanner.js";
 
-        <div class="input-group">
-            <input type="text" id="textInput" placeholder="Type text...">
-            <button onclick="sendType()">Type</button>
-        </div>
-    </div>
-
-    <script>
         const socket = io();
-        
-        function onScanSuccess() { 
-            html5QrcodeScanner.clear(); 
-            startControl(); 
-        }
-        
-        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-        html5QrcodeScanner.render(onScanSuccess);
+
+        // --- 2. UI CONSTRUCTION (using DomBuilder) ---
+
+        // A. Create Inputs
+        const urlInput = DomBuilder.of("input")
+            .attr("type", "text")
+            .attr("placeholder", "https://pedroth.github.io");
+
+        const textInput = DomBuilder.of("input")
+            .attr("type", "text")
+            .attr("placeholder", "Type text...");
+
+        // B. Create the Scan Section
+        const scanSection = DomBuilder.of("div")
+            .attr("id", "scan-section")
+            .append(
+                DomBuilder.of("h2").inner("Scan Server QR"),
+                // The library needs a div with an ID to render into
+                DomBuilder.of("div")
+                    .attr("id", "reader")
+                    .style("width: 300px; margin: 0 auto;"),
+                DomBuilder.of("button")
+                    .style("margin-top:20px;")
+                    .inner("Skip / Connected")
+                    .event("click", startControl)
+            );
+
+        // C. Create the Control Section (Hidden initially)
+        const controlSection = DomBuilder.of("div")
+            .attr("id", "control-section")
+            .addClass("hidden")
+            .append(
+                DomBuilder.of("div").addClass("status-bar").inner("Connected via Bun 🚀"),
+
+                // URL Group
+                DomBuilder.of("div").addClass("input-group").append(
+                    urlInput,
+                    DomBuilder.of("button").inner("Go").event("click", sendGoto)
+                ),
+
+                // Trackpad
+                DomBuilder.of("div").attr("id", "trackpad").append(
+                    DomBuilder.of("span").inner(`
+                    Touch Area\n\n
+                    1-Finger Move: Move Mouse\n
+                    1-Finger Double Tap: Left Click\n
+                    2-Finger Tap: Right Click\n
+                    2-Finger Move: Scroll\n
+                    `)
+                ),
+
+                // Mouse Buttons
+                DomBuilder.of("div").addClass("mouse-btns").append(
+                    DomBuilder.of("button").addClass("btn-large").inner("L-Click")
+                        .event("click", () => sendClick('left')),
+                    DomBuilder.of("button").addClass("btn-large").inner("R-Click")
+                        .event("click", () => sendClick('right'))
+                ),
+
+                // Keyboard Group
+                DomBuilder.of("div").addClass("input-group").append(
+                    textInput,
+                    DomBuilder.of("button").inner("Type").event("click", sendType)
+                )
+            );
+
+        // --- 3. RENDER TO DOM ---
+        DomBuilder.of(document.body).append(scanSection, controlSection);
+
+
+        // --- 4. LOGIC & HANDLERS ---
+
+        // Initialize QR Scanner
+        // Wait slightly for DOM to settle
+        setTimeout(() => {
+            try {
+                let aQrScanner = new qrScanner(
+                    "reader",
+                    { fps: 10, qrbox: 250 }
+                );
+                aQrScanner.render(onScanSuccess);
+
+                function onScanSuccess() {
+                    aQrScanner.clear();
+                    startControl();
+                }
+            } catch (err) {
+                console.error("Scanner failed to init:", err);
+            }
+        }, 200);
 
         function startControl() {
-            document.getElementById('scan-section').style.display = 'none';
-            document.getElementById('control-section').classList.remove('hidden');
+            scanSection.style('display:none');
+            controlSection.removeClass('hidden');
         }
 
         function sendGoto() {
-            const val = document.getElementById('urlInput').value;
-            if(val) { socket.emit('cmd_goto', val); document.getElementById('urlInput').value = ''; }
+            const val = urlInput.element.value;
+            if (val) {
+                socket.emit('cmd_goto', val);
+                urlInput.element.value = '';
+            }
         }
-        function sendType() {
-            const val = document.getElementById('textInput').value;
-            if(val) { socket.emit('cmd_type', val); document.getElementById('textInput').value = ''; }
-        }
-        function sendClick(btn) { socket.emit('cmd_mouse_click', btn); }
 
-        // Trackpad Logic
-        const pad = document.getElementById('trackpad');
-        let lastX=0, lastY=0;
-        pad.addEventListener('touchstart', e => { 
-            e.preventDefault(); 
-            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; 
-        }, {passive:false});
-        pad.addEventListener('touchmove', e => {
+        function sendType() {
+            const val = textInput.element.value;
+            if (val) {
+                socket.emit('cmd_type', val);
+                textInput.element.value = '';
+            }
+        }
+
+        function sendClick(btn) {
+            socket.emit('cmd_mouse_click', btn);
+        }
+
+        // --- 5. TRACKPAD EVENT LISTENERS ---
+        const padElement = document.getElementById('trackpad');
+
+        let lastX = 0, lastY = 0;
+        let lastTapTime = 0;
+        let isTwoFinger = false;
+
+        // Touch Start
+        padElement.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            const curX = e.touches[0].clientX; const curY = e.touches[0].clientY;
-            socket.emit('cmd_mouse_move', { x: curX - lastX, y: curY - lastY });
-            lastX = curX; lastY = curY;
-        }, {passive:false});
+
+            const touches = e.touches.length;
+
+            // Detect two-finger gesture
+            isTwoFinger = touches === 2;
+
+            if (touches === 1) {
+                const now = Date.now();
+                if (now - lastTapTime < 300) {
+                    // DOUBLE TAP → LEFT CLICK
+                    socket.emit('cmd_mouse_click', 'left');
+                }
+                lastTapTime = now;
+            }
+            else if (touches === 2) {
+                // Two-finger TAP (short duration) → RIGHT CLICK
+                lastTapTime = Date.now();
+            }
+
+            const touch = e.touches[0];
+            lastX = touch.clientX;
+            lastY = touch.clientY;
+        }, { passive: false });
+
+
+        // Touch Move
+        padElement.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+
+            const touches = e.touches.length;
+
+            if (touches === 1 && !isTwoFinger) {
+                // Normal mouse move
+                const t = e.touches[0];
+                const dx = t.clientX - lastX;
+                const dy = t.clientY - lastY;
+
+                socket.emit('cmd_mouse_move', { x: dx, y: dy });
+
+                lastX = t.clientX;
+                lastY = t.clientY;
+            }
+            else if (touches === 2) {
+                // Two-finger scroll
+                const t = e.touches[0];
+                const dy = t.clientY - lastY;
+
+                socket.emit('cmd_scroll', { amount: dy });
+
+                lastY = t.clientY;
+            }
+        }, { passive: false });
+
+
+        // Touch End → detect two-finger tap for right-click
+        padElement.addEventListener('touchend', (e) => {
+            const touches = e.touches.length;
+
+            if (!isTwoFinger) return;
+
+            const now = Date.now();
+            if (now - lastTapTime < 250) {
+                // Two-finger quick tap → RIGHT CLICK
+                socket.emit('cmd_mouse_click', 'right');
+            }
+
+            isTwoFinger = false;
+        }, { passive: false });
     </script>
 </body>
+
 </html>
