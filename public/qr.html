@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Scan Me</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="host-body">
+    <div class="container">
+        <h1>Scan to Control</h1>
+        <div id="qrcode"></div>
+        <p id="status" style="margin-top: 20px; word-break: break-all;">Fetching IP...</p>
+    </div>
+    <script>
+        fetch('/config')
+            .then(res => res.json())
+            .then(data => {
+                const url = data.hostUrl;
+                document.getElementById('status').innerText = url;
+                new QRCode(document.getElementById("qrcode"), {
+                    text: url, width: 256, height: 256
+                });
+            });
+    </script>
+</body>
+</html>

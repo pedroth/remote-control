@@ -1,0 +1,17 @@
+{
+  "name": "remote-control",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@jitsi/robotjs": "^0.6.11",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "open": "^9.1.0",
+    "ip": "^1.1.8"
+  }
+}

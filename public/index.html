@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Controller</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+    <div id="scan-section">
+        <h2>Scan Server QR</h2>
+        <div id="reader" style="width: 300px; margin: 0 auto;"></div>
+        <button onclick="startControl()" style="margin-top:20px;">Skip / Connected</button>
+    </div>
+
+    <div id="control-section" class="hidden">
+        <div class="status-bar">Connected via Bun 🚀</div>
+        
+        <div class="input-group">
+            <input type="text" id="urlInput" placeholder="google.com">
+            <button onclick="sendGoto()">Go</button>
+        </div>
+
+        <div id="trackpad"><span>Touch Area</span></div>
+
+        <div class="mouse-btns">
+            <button class="btn-large" onclick="sendClick('left')">L-Click</button>
+            <button class="btn-large" onclick="sendClick('right')">R-Click</button>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="textInput" placeholder="Type text...">
+            <button onclick="sendType()">Type</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        function onScanSuccess() { 
+            html5QrcodeScanner.clear(); 
+            startControl(); 
+        }
+        
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+
+        function startControl() {
+            document.getElementById('scan-section').style.display = 'none';
+            document.getElementById('control-section').classList.remove('hidden');
+        }
+
+        function sendGoto() {
+            const val = document.getElementById('urlInput').value;
+            if(val) { socket.emit('cmd_goto', val); document.getElementById('urlInput').value = ''; }
+        }
+        function sendType() {
+            const val = document.getElementById('textInput').value;
+            if(val) { socket.emit('cmd_type', val); document.getElementById('textInput').value = ''; }
+        }
+        function sendClick(btn) { socket.emit('cmd_mouse_click', btn); }
+
+        // Trackpad Logic
+        const pad = document.getElementById('trackpad');
+        let lastX=0, lastY=0;
+        pad.addEventListener('touchstart', e => { 
+            e.preventDefault(); 
+            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; 
+        }, {passive:false});
+        pad.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const curX = e.touches[0].clientX; const curY = e.touches[0].clientY;
+            socket.emit('cmd_mouse_move', { x: curX - lastX, y: curY - lastY });
+            lastX = curX; lastY = curY;
+        }, {passive:false});
+    </script>
+</body>
+</html>
