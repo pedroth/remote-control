@@ -19,10 +19,6 @@
         // Socket.io (ESM version)
         import { io } from "./socket.js";
 
-        // --- THE FIX IS HERE ---
-        // We use esm.sh which wraps the library in a compatible module format
-        import { Html5QrcodeScanner as qrScanner } from "./qrScanner.js";
-
         const socket = io();
 
         // --- 2. UI CONSTRUCTION (using DomBuilder) ---
@@ -36,25 +32,10 @@
             .attr("type", "text")
             .attr("placeholder", "Type text...");
 
-        // B. Create the Scan Section
-        const scanSection = DomBuilder.of("div")
-            .attr("id", "scan-section")
-            .append(
-                DomBuilder.of("h2").inner("Scan Server QR"),
-                // The library needs a div with an ID to render into
-                DomBuilder.of("div")
-                    .attr("id", "reader")
-                    .style("width: 300px; margin: 0 auto;"),
-                DomBuilder.of("button")
-                    .style("margin-top:20px;")
-                    .inner("Skip / Connected")
-                    .event("click", startControl)
-            );
 
-        // C. Create the Control Section (Hidden initially)
+        // B. Create the Control Section (Hidden initially)
         const controlSection = DomBuilder.of("div")
             .attr("id", "control-section")
-            .addClass("hidden")
             .append(
                 DomBuilder.of("div").addClass("status-bar").inner("Connected via Bun 🚀"),
 
@@ -87,35 +68,10 @@
             );
 
         // --- 3. RENDER TO DOM ---
-        DomBuilder.of(document.body).append(scanSection, controlSection);
+        DomBuilder.of(document.body).append(controlSection);
 
 
         // --- 4. LOGIC & HANDLERS ---
-
-        // Initialize QR Scanner
-        // Wait slightly for DOM to settle
-        setTimeout(() => {
-            try {
-                let aQrScanner = new qrScanner(
-                    "reader",
-                    { fps: 10, qrbox: 250 }
-                );
-                aQrScanner.render(onScanSuccess);
-
-                function onScanSuccess() {
-                    aQrScanner.clear();
-                    startControl();
-                }
-            } catch (err) {
-                console.error("Scanner failed to init:", err);
-            }
-        }, 200);
-
-        function startControl() {
-            scanSection.style('display:none');
-            controlSection.removeClass('hidden');
-        }
-
         function sendGoto() {
             const val = urlInput.element.value;
             if (val) {
