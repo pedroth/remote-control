@@ -13,17 +13,11 @@
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
     <script type="module">
-        // 1. IMPORTS
         import DomBuilder from "./domBuilder.js";
-
-        // Socket.io (ESM version)
         import { io } from "./socket.js";
 
         const socket = io();
 
-        // --- 2. UI CONSTRUCTION (using DomBuilder) ---
-
-        // A. Create Inputs
         const urlInput = DomBuilder.of("input")
             .attr("type", "text")
             .attr("placeholder", "https://pedroth.github.io");
@@ -32,46 +26,143 @@
             .attr("type", "text")
             .attr("placeholder", "Type text...");
 
-
-        // B. Create the Control Section (Hidden initially)
-        const controlSection = DomBuilder.of("div")
-            .attr("id", "control-section")
-            .append(
-                DomBuilder.of("div").addClass("status-bar").inner("Connected via Bun 🚀"),
-
-                // URL Group
-                DomBuilder.of("div").addClass("input-group").append(
-                    urlInput,
-                    DomBuilder.of("button").inner("Go").event("click", sendGoto)
-                ),
-
-                // Trackpad
-                DomBuilder.of("div")
-                    .attr("id", "trackpad")
-                    .append(
-                        DomBuilder
-                            .of("span")
-                            .inner(`Touch Area`)
-                    ),
-                DomBuilder.of("div").addClass("info-text").inner(`
+        function getTrackPad() {
+            const trackPad = DomBuilder.of("div")
+                .attr("id", "trackpad")
+                .append(
+                    DomBuilder
+                        .of("span")
+                        .inner(`
+                    Touch area <br><br>
                     1-Finger Move: Move Mouse<br>
                     1-Finger Double Tap: Left Click<br>
                     2-Finger Tap: Right Click<br>
-                    2-Finger Move: Scroll
-                `),
-
-                // Keyboard Group
-                DomBuilder.of("div").addClass("input-group").append(
-                    textInput,
-                    DomBuilder.of("button").inner("Type").event("click", sendType)
+                    2-Finger Move: Scroll`)
                 )
+
+            let lastX = 0, lastY = 0;
+            let singleTapTime = 0;
+            let isDragging = false;
+            let isTwoFinger = false;
+            let isScrolling = false;
+
+            // Touch Start
+            trackPad.event("touchstart", (e) => {
+                e.preventDefault();
+
+                const touches = e.touches.length;
+
+                // --- 1-FINGER DOUBLE TAP HOLD → DRAG ---
+                if (touches === 1) {
+                    const now = Date.now();
+                    if (now - singleTapTime < 300) {
+                        // Double tap detected: begin drag
+                        socket.emit("cmd_mouse_down", "left");
+                        isDragging = true;
+                    }
+                    singleTapTime = now;
+                }
+
+                // --- 2-FINGER TAP / SCROLL DETECTION ---
+                if (touches === 2) {
+                    isTwoFinger = true;
+                }
+
+                const t = e.touches[0];
+                lastX = t.clientX;
+                lastY = t.clientY;
+            }, { passive: false });
+
+
+            // Touch Move
+            trackPad.event("touchmove", (e) => {
+                e.preventDefault();
+
+                const touches = e.touches.length;
+
+                // --- 2-FINGER SCROLL ---
+                if (touches === 2) {
+                    const t = e.touches[0];
+                    const dy = t.clientY - lastY;
+
+                    eruda.get('console').log('SCROLL DETECTED', dy);
+                    if (dy === 0) return; // No movement
+
+                    socket.emit("cmd_scroll", { amount: dy });
+
+                    lastY = t.clientY;
+                    isScrolling = true;
+                    return;
+                }
+
+                // --- 1-FINGER MOVE ---
+                if (touches === 1 && !isTwoFinger) {
+                    const t = e.touches[0];
+                    const dx = t.clientX - lastX;
+                    const dy = t.clientY - lastY;
+
+                    socket.emit("cmd_mouse_move", { x: dx, y: dy });
+
+                    lastX = t.clientX;
+                    lastY = t.clientY;
+                }
+            }, { passive: false });
+
+
+            // Touch End
+            trackPad.event("touchend", (e) => {
+                const touchesLeft = e.touches.length;
+
+                // --- END DRAG ---
+                if (isDragging && touchesLeft === 0) {
+                    socket.emit("cmd_mouse_up", "left");
+                    isDragging = false;
+                    return;
+                }
+
+                eruda.get('console').log('ATTEMPT RIGHT CLICK CHECK', isTwoFinger, touchesLeft, isScrolling);
+                // --- 2-FINGER TAP → RIGHT CLICK ---
+                if (isTwoFinger && touchesLeft === 1 && !isScrolling) {
+                    eruda.get('console').log('RIGHT CLICK: two-finger tap detected');
+                    socket.emit("cmd_mouse_click", "right");
+                }
+
+                isTwoFinger = false;
+                isScrolling = false;
+            }, { passive: false });
+            return trackPad;
+        }
+
+
+        const controlSection = DomBuilder.of("div")
+            .attr("id", "control-section")
+            .append(
+                DomBuilder
+                    .of("div")
+                    .addClass("status-bar")
+                    .inner("Connected via Bun 🚀"),
+                DomBuilder.of("div")
+                    .addClass("input-group")
+                    .append(
+                        urlInput,
+                        DomBuilder.of("button")
+                            .inner("Go")
+                            .event("click", sendGoto)
+                    ),
+                getTrackPad(),
+                
+                DomBuilder.of("div")
+                    .addClass("input-group")
+                    .append(
+                        textInput,
+                        DomBuilder.of("button")
+                            .inner("Type")
+                            .event("click", sendType)
+                    )
             );
 
-        // --- 3. RENDER TO DOM ---
         DomBuilder.of(document.body).append(controlSection);
 
-
-        // --- 4. LOGIC & HANDLERS ---
         function sendGoto() {
             const val = urlInput.element.value;
             if (val) {
@@ -92,101 +183,6 @@
         function sendClick(btn) {
             socket.emit('cmd_mouse_click', btn);
         }
-
-        // --- 5. TRACKPAD EVENT LISTENERS ---
-        const padElement = document.getElementById("trackpad");
-
-        let lastX = 0, lastY = 0;
-        let singleTapTime = 0;
-        let isDragging = false;
-        let isTwoFinger = false;
-        let isScrolling = false;
-
-        // Touch Start
-        padElement.addEventListener("touchstart", (e) => {
-            e.preventDefault();
-
-            const touches = e.touches.length;
-
-            // --- 1-FINGER DOUBLE TAP HOLD → DRAG ---
-            if (touches === 1) {
-                const now = Date.now();
-                if (now - singleTapTime < 300) {
-                    // Double tap detected: begin drag
-                    socket.emit("cmd_mouse_down", "left");
-                    isDragging = true;
-                }
-                singleTapTime = now;
-            }
-
-            // --- 2-FINGER TAP / SCROLL DETECTION ---
-            if (touches === 2) {
-                isTwoFinger = true;
-            }
-
-            const t = e.touches[0];
-            lastX = t.clientX;
-            lastY = t.clientY;
-        }, { passive: false });
-
-
-        // Touch Move
-        padElement.addEventListener("touchmove", (e) => {
-            e.preventDefault();
-
-            const touches = e.touches.length;
-
-            // --- 2-FINGER SCROLL ---
-            if (touches === 2) {
-                const t = e.touches[0];
-                const dy = t.clientY - lastY;
-
-                eruda.get('console').log('SCROLL DETECTED', dy);
-                if(dy === 0) return; // No movement
-
-                socket.emit("cmd_scroll", { amount: dy });
-
-                lastY = t.clientY;
-                isScrolling = true;
-                return;
-            }
-
-            // --- 1-FINGER MOVE ---
-            if (touches === 1 && !isTwoFinger) {
-                const t = e.touches[0];
-                const dx = t.clientX - lastX;
-                const dy = t.clientY - lastY;
-
-                socket.emit("cmd_mouse_move", { x: dx, y: dy });
-
-                lastX = t.clientX;
-                lastY = t.clientY;
-            }
-        }, { passive: false });
-
-
-        // Touch End
-        padElement.addEventListener("touchend", (e) => {
-            const touchesLeft = e.touches.length;
-
-            // --- END DRAG ---
-            if (isDragging && touchesLeft === 0) {
-                socket.emit("cmd_mouse_up", "left");
-                isDragging = false;
-                return;
-            }
-
-            eruda.get('console').log('ATTEMPT RIGHT CLICK CHECK', isTwoFinger, touchesLeft, isScrolling);
-            // --- 2-FINGER TAP → RIGHT CLICK ---
-            if (isTwoFinger && touchesLeft === 1 && !isScrolling) {
-                eruda.get('console').log('RIGHT CLICK: two-finger tap detected');
-                socket.emit("cmd_mouse_click", "right");
-            }
-
-            isTwoFinger = false;
-            isScrolling = false;
-        }, { passive: false });
-
 
     </script>
 </body>
