@@ -14,9 +14,16 @@
     <script>eruda.init();</script>
     <script type="module">
         import DomBuilder from "./domBuilder.js";
-        import { io } from "./socket.js";
 
-        const socket = io();
+        // Use native WebSocket
+        const socket = new WebSocket(
+            (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host
+        );
+
+        // Helper to send events in the same format as socket.io
+        function emit(event, data) {
+            socket.send(JSON.stringify({ event, data }));
+        }
 
         const urlInput = DomBuilder.of("input")
             .attr("type", "text")
@@ -57,7 +64,7 @@
                     const now = Date.now();
                     if (now - singleTapTime < 300) {
                         // Double tap detected: begin drag
-                        socket.emit("cmd_mouse_down", "left");
+                        emit("cmd_mouse_down", "left");
                         isDragging = true;
                     }
                     singleTapTime = now;
@@ -88,7 +95,7 @@
                     eruda.get('console').log('SCROLL DETECTED', dy);
                     if (dy === 0) return; // No movement
 
-                    socket.emit("cmd_scroll", { amount: dy });
+                    emit("cmd_scroll", { amount: dy });
 
                     lastY = t.clientY;
                     isScrolling = true;
@@ -101,7 +108,7 @@
                     const dx = t.clientX - lastX;
                     const dy = t.clientY - lastY;
 
-                    socket.emit("cmd_mouse_move", { x: dx, y: dy });
+                    emit("cmd_mouse_move", { x: dx, y: dy });
 
                     lastX = t.clientX;
                     lastY = t.clientY;
@@ -115,7 +122,7 @@
 
                 // --- END DRAG ---
                 if (isDragging && touchesLeft === 0) {
-                    socket.emit("cmd_mouse_up", "left");
+                    emit("cmd_mouse_up", "left");
                     isDragging = false;
                     return;
                 }
@@ -124,7 +131,7 @@
                 // --- 2-FINGER TAP → RIGHT CLICK ---
                 if (isTwoFinger && touchesLeft === 1 && !isScrolling) {
                     eruda.get('console').log('RIGHT CLICK: two-finger tap detected');
-                    socket.emit("cmd_mouse_click", "right");
+                    emit("cmd_mouse_click", "right");
                 }
 
                 isTwoFinger = false;
@@ -166,7 +173,7 @@
         function sendGoto() {
             const val = urlInput.element.value;
             if (val) {
-                socket.emit('cmd_goto', val);
+                emit('cmd_goto', val);
                 urlInput.element.value = '';
             }
         }
@@ -174,14 +181,14 @@
         function sendType() {
             const val = textInput.element.value;
             if (val) {
-                socket.emit('cmd_type', val);
+                emit('cmd_type', val);
                 textInput.element.value = '';
             }
         }
 
         // not used, kept for reference
         function sendClick(btn) {
-            socket.emit('cmd_mouse_click', btn);
+            emit('cmd_mouse_click', btn);
         }
 
     </script>
