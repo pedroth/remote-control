@@ -129,7 +129,7 @@ class mySocket {
         try { robot.mouseToggle('up', data); } catch (e) { }
     });
     wss.on('cmd_type', async (data) => {
-        try { robot.typeString(data); robot.keyTap("enter"); } catch (e) { }
+        try { robot.typeString(data); } catch (e) { }
     });
     wss.on('cmd_scroll', async (data) => {
         try {
@@ -137,11 +137,17 @@ class mySocket {
             robot.scrollMouse(0, data.amount * speed);
         } catch (e) { }
     });
+    wss.on('cmd_key_tap', (key) => {
+        try {
+            robot.keyTap(key);
+        } catch (e) {
+            console.error(e);
+        }
+    });
     wss.init();
 
     httpServer.listen(PORT, () => {
         console.log(`Address: http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
-        console.log(`Note: You will still see a 'Not Secure' warning in the browser.`);
         // launch browser automatically
         open(`http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
     });

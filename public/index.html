@@ -31,7 +31,18 @@
 
         const textInput = DomBuilder.of("input")
             .attr("type", "text")
-            .attr("placeholder", "Type text...");
+            .attr("placeholder", "Type text...")
+            .event("keydown", (e) => {
+                console.log("!!!!", e.key);
+                if (e.key === "Enter") {
+                    sendKey("enter");
+                } else if (e.key === "Backspace") {
+                    sendKey("backspace");
+                } else {
+                    sendType(textInput.element.value);
+                    textInput.element.value = '';
+                }
+            });
 
         function getTrackPad() {
             const trackPad = DomBuilder.of("div")
@@ -147,7 +158,7 @@
                 DomBuilder
                     .of("div")
                     .addClass("status-bar")
-                    .inner("Connected via Bun 🚀"),
+                    .inner("Connected to remote-control 🚀"),
                 DomBuilder.of("div")
                     .addClass("input-group")
                     .append(
@@ -157,15 +168,11 @@
                             .event("click", sendGoto)
                     ),
                 getTrackPad(),
-                
                 DomBuilder.of("div")
                     .addClass("input-group")
                     .append(
                         textInput,
-                        DomBuilder.of("button")
-                            .inner("Type")
-                            .event("click", sendType)
-                    )
+                    ),
             );
 
         DomBuilder.of(document.body).append(controlSection);
@@ -178,12 +185,12 @@
             }
         }
 
-        function sendType() {
-            const val = textInput.element.value;
-            if (val) {
-                emit('cmd_type', val);
-                textInput.element.value = '';
-            }
+        function sendType(val) {
+            emit('cmd_type', val);
+        }
+        
+        function sendKey(val) {
+            emit('cmd_key_tap', val);
         }
 
         // not used, kept for reference
