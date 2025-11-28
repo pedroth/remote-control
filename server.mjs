@@ -8,14 +8,8 @@ import path from 'path';
 import robot from '@jitsi/robotjs';
 import { cwd } from "process";
 import { WebSocketServer } from 'ws';
+import { $ } from 'bun';
 
-const app = express();
-
-// 2. Load the certificate files you just generated
-const httpsOptions = {
-    key: readFileSync('key.pem'),
-    cert: readFileSync('cert.pem')
-};
 
 class mySocket {
     constructor(httpsServer) {
@@ -55,67 +49,100 @@ class mySocket {
 
 }
 
-// 3. Create an HTTPS server instead of HTTP
+// main server logic
+(async () => {
 
-const httpsServer = createServer(httpsOptions, app);
-const wss = new mySocket(httpsServer);
+    // check args, if -s is provided, use https
+    const isSelfSigned = process.argv.includes('-s');
+    if (isSelfSigned) {
+        console.log("Using self-signed certificates for HTTPS.");
 
-const PORT = 3000;
-const LOCAL_IP = ip.address();
+        const keyFile = Bun.file("key.pem");
+        const certFile = Bun.file("cert.pem");
+
+        const keyExists = await keyFile.exists();
+        const certExists = await certFile.exists();
+
+        const keyEmpty = !keyExists || (await keyFile.text()).trim().length === 0;
+        const certEmpty = !certExists || (await certFile.text()).trim().length === 0;
+
+        if (keyEmpty || certEmpty) {
+            console.log("Generating self-signed certificates...");
+
+            const result = await $`openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"`.quiet();
+
+            if (result.exitCode !== 0) {
+                console.error("Failed to generate self-signed certificates:");
+                console.error(result.stderr?.toString());
+                process.exit(1);
+            }
+
+            console.log("Self-signed certificates generated.");
+        }
+    }
+
+    const app = express();
+    const httpsOptions = isSelfSigned ? {
+        key: readFileSync('key.pem'),
+        cert: readFileSync('cert.pem')
+    } : {};
+
+    const httpServer = createServer(httpsOptions, app);
+    const wss = new mySocket(httpServer);
+
+    const PORT = 3000;
+    const LOCAL_IP = ip.address();
 
 
-// Get current file directory in any environment
-const __dirname = cwd();
-const PUBLIC_DIR = path.join(__dirname, 'public');
+    // Get current file directory in any environment
+    const __dirname = cwd();
+    const PUBLIC_DIR = path.join(__dirname, 'public');
 
-app.use(express.static(PUBLIC_DIR));
+    app.use(express.static(PUBLIC_DIR));
 
-app.get('/config', (req, res) => {
-    // 4. Update protocol to HTTPS
-    res.json({
-        hostUrl: `https://${LOCAL_IP}:${PORT}/index.html`
+    app.get('/config', (req, res) => {
+        // 4. Update protocol to HTTPS
+        res.json({
+            hostUrl: `http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/index.html`
+        });
     });
-});
 
 
-wss.on('cmd_goto', async (data) => {
-    let url = data;
-    if (!url.startsWith('http')) url = 'https://' + url;
-    await open(url);
-});
-wss.on('cmd_mouse_move', async (data) => {
-    try {
-        const mouse = robot.getMousePos();
-        const speed = 2.0;
-        robot.moveMouse(mouse.x + (data.x * speed), mouse.y + (data.y * speed));
-    } catch (e) { }
-});
-wss.on('cmd_mouse_click', async (data) => {
-    try { robot.mouseClick(data); } catch (e) { }
-});
-wss.on('cmd_mouse_down', async (data) => {
-    try { robot.mouseToggle('down', data); } catch (e) { }
-});
-wss.on('cmd_mouse_up', async (data) => {
-    try { robot.mouseToggle('up', data); } catch (e) { }
-});
-wss.on('cmd_type', async (data) => {
-    try { robot.typeString(data); robot.keyTap("enter"); } catch (e) { }
-});
-wss.on('cmd_scroll', async (data) => {
-    try { 
-        const speed = 1;
-        robot.scrollMouse(0, data.amount * speed);
-    } catch (e) { }
-});
-wss.init();
+    wss.on('cmd_goto', async (data) => {
+        let url = data;
+        await open(url);
+    });
+    wss.on('cmd_mouse_move', async (data) => {
+        try {
+            const mouse = robot.getMousePos();
+            const speed = 2.0;
+            robot.moveMouse(mouse.x + (data.x * speed), mouse.y + (data.y * speed));
+        } catch (e) { }
+    });
+    wss.on('cmd_mouse_click', async (data) => {
+        try { robot.mouseClick(data); } catch (e) { }
+    });
+    wss.on('cmd_mouse_down', async (data) => {
+        try { robot.mouseToggle('down', data); } catch (e) { }
+    });
+    wss.on('cmd_mouse_up', async (data) => {
+        try { robot.mouseToggle('up', data); } catch (e) { }
+    });
+    wss.on('cmd_type', async (data) => {
+        try { robot.typeString(data); robot.keyTap("enter"); } catch (e) { }
+    });
+    wss.on('cmd_scroll', async (data) => {
+        try {
+            const speed = 1;
+            robot.scrollMouse(0, data.amount * speed);
+        } catch (e) { }
+    });
+    wss.init();
 
-// 5. Listen using the httpsServer
-httpsServer.listen(PORT, () => {
-    console.log(`\n--- SECURE REMOTE CONTROL ---`);
-    console.log(`Address: https://${LOCAL_IP}:${PORT}/qr.html`);
-    console.log(`Note: You will still see a 'Not Secure' warning in the browser.`);
-    console.log(`      Click 'Advanced' -> 'Proceed' to allow the Camera.`);
-    // launch browser automatically
-    open(`https://${LOCAL_IP}:${PORT}/qr.html`);
-});
+    httpServer.listen(PORT, () => {
+        console.log(`Address: http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
+        console.log(`Note: You will still see a 'Not Secure' warning in the browser.`);
+        // launch browser automatically
+        open(`http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
+    });
+})()
