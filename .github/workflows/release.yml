@@ -4,25 +4,32 @@ on:
   push:
     branches:
       - main
+    # Removed 'tags:' trigger because the job itself will now create the tag.
 
 jobs:
   build-and-zip:
     runs-on: ubuntu-latest
+    # --- FIX: ADDED PERMISSIONS BLOCK ---
     permissions:
       contents: write # Required for creating tags and releases
+    # ------------------------------------
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
 
+      # --- NEW: Install JQ for JSON parsing ---
       - name: Install JQ
         run: sudo apt-get update && sudo apt-get install -y jq
+      # --- END NEW ---
       
+      # --- FIX: Install System Libraries for Native Module (@jitsi/robotjs) ---
       - name: Install Native Build Prerequisites (for robotjs)
         run: |
           sudo apt-get update
           # build-essential for C++ compilation; libxtst-dev for X11/robot support
           sudo apt-get install -y build-essential libxtst-dev
+      # --- END FIX ---
 
 
       - name: Set up Bun
@@ -32,15 +39,20 @@ jobs:
 
 
       - name: Install dependencies
-        run: bun install
+        # FIX: Setting NODE_BINDINGS_DYN_BUNDLE to help Bun link native modules
+        run: |
+          NODE_BINDINGS_DYN_BUNDLE=1 bun install
         
+      # --- NEW: Extract version from package.json ---
       - name: Extract package version
         id: package_version_step
         run: echo "PACKAGE_VERSION=$(jq -r '.version' package.json)" >> $GITHUB_ENV
+      # --- END NEW ---
 
 
       - name: Build Linux executable
-        run: bun run build-linux
+        # FIX: Use NODE_BINDINGS_DYN_BUNDLE during compilation as well
+        run: NODE_BINDINGS_DYN_BUNDLE=1 bun run build-linux
 
       - name: Build Windows executable
         run: bun run build-windows
@@ -66,12 +78,16 @@ jobs:
           cd ../release-win && zip -r ../remote-control-win.zip .
 
 
+      # --- NEW STEP TO GENERATE TAG AND SET AS ENV VAR ---
       - name: Set dynamic tag name
         id: tag_name_step
+        # Now uses the package version for the tag prefix
         run: echo "RELEASE_TAG=v${{ env.PACKAGE_VERSION }}-${{ github.sha }}" >> $GITHUB_ENV
+      # --- END NEW STEP ---
 
 
       - name: Create GitHub Release
+        # 🚨 FIX: We remove the 'if' condition and use 'tag_name' property to create the release
         uses: softprops/action-gh-release@v1
         with:
           # Use the dynamically generated tag name
@@ -80,6 +96,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           # Set the release as a draft until a proper version number is ready
           draft: true
+          # 🚨 FIX: Updated the release name format 🚨
           name: Remote-Control Release v${{ env.PACKAGE_VERSION }}
           body: |
             Automated build for version v${{ env.PACKAGE_VERSION }} (commit ${{ github.sha }}).
