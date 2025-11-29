@@ -13,6 +13,10 @@ jobs:
     permissions:
       contents: write # Required for creating tags and releases
     # ------------------------------------
+    # FIX: Elevating NODE_BINDINGS_DYN_BUNDLE to the job environment
+    env:
+      NODE_BINDINGS_DYN_BUNDLE: 1 # Attempt to force dynamic linking bundle for native modules
+    # ------------------------------------
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,8 +31,10 @@ jobs:
       - name: Install Native Build Prerequisites (for robotjs)
         run: |
           sudo apt-get update
-          # build-essential for C++ compilation, libxtst-dev for X11/robot support
-          sudo apt-get install -y build-essential libxtst-dev
+          # build-essential for C++ compilation
+          # libxtst-dev for X11/robot control (required by robotjs)
+          # NEW: libudev-dev is often required for input device handling
+          sudo apt-get install -y build-essential libxtst-dev libudev-dev
       # --- END FIX ---
 
 
@@ -39,9 +45,8 @@ jobs:
 
 
       - name: Install dependencies
-        # FIX: Setting NODE_BINDINGS_DYN_BUNDLE to help Bun link native modules
-        run: |
-          NODE_BINDINGS_DYN_BUNDLE=1 bun install
+        # NODE_BINDINGS_DYN_BUNDLE is now set at the job level
+        run: bun install
         
       # --- NEW: Extract version from package.json ---
       - name: Extract package version
@@ -51,12 +56,8 @@ jobs:
 
 
       - name: Build Linux executable
-        # FIX: Use NODE_BINDINGS_DYN_BUNDLE during compilation as well
-        # NOTE: We use the 'env' block to ensure the environment variable is correctly
-        # passed to the 'bun run' subprocess, which can sometimes be more reliable.
+        # NODE_BINDINGS_DYN_BUNDLE is now set at the job level
         run: bun run build-linux
-        env:
-          NODE_BINDINGS_DYN_BUNDLE: 1
 
       - name: Build Windows executable
         run: bun run build-windows
