@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "bun run ./server.mjs",
-    "pub": "bun version patch; git push origin $(git describe --tags `git rev-list --tags --max-count=1`)",
+    "pub": "bun pm version patch; git push origin $(git describe --tags `git rev-list --tags --max-count=1`)",
     "build-windows": "bun build --compile --target=bun-windows-x64 ./server.mjs --outfile remote-control-server.exe",
     "build-linux": "bun build --compile --target=bun-linux-x64 ./server.mjs --outfile remote-control-server"
   },
