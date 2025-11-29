@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-zip:
     runs-on: ubuntu-latest
+    # --- FIX: ADDED PERMISSIONS BLOCK ---
+    permissions:
+      contents: write # Required for creating tags and releases
+    # ------------------------------------
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
