@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags: # 🚨 NEW: Trigger the workflow when a tag is pushed
+      - 'v*' # Runs on any tag starting with 'v', like v1.0, v1.2.3
 
 jobs:
   build-and-zip:
@@ -30,6 +32,8 @@ jobs:
         run: bun run build-windows
 
 
+      # Executables are correctly named 'remote-control-server' and 'remote-control-server.exe' 
+      # based on package.json, so no debug step is needed.
       - name: Prepare release folders
         run: |
           mkdir -p release-linux
@@ -49,6 +53,8 @@ jobs:
 
 
       - name: Create GitHub Release
+        # 🚨 FIX: Only run this step if the workflow was triggered by a tag push
+        if: startsWith(github.ref, 'refs/tags/') 
         uses: softprops/action-gh-release@v1
         with:
           files: |
