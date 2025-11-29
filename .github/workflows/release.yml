@@ -4,18 +4,19 @@ on:
   push:
     branches:
       - main
-    # Removed 'tags:' trigger because the job itself will now create the tag.
 
 jobs:
   build-and-zip:
     runs-on: ubuntu-latest
-    # --- FIX: ADDED PERMISSIONS BLOCK ---
     permissions:
       contents: write # Required for creating tags and releases
-    # ------------------------------------
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+
+      - name: Install JQ
+        run: sudo apt-get update && sudo apt-get install -y jq
 
 
       - name: Set up Bun
@@ -26,6 +27,10 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+        
+      - name: Extract package version
+        id: package_version_step
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' package.json)" >> $GITHUB_ENV
 
 
       - name: Build Linux executable
@@ -58,24 +63,18 @@ jobs:
       # --- NEW STEP TO GENERATE TAG AND SET AS ENV VAR ---
       - name: Set dynamic tag name
         id: tag_name_step
-        run: echo "RELEASE_TAG=build-${{ github.sha }}" >> $GITHUB_ENV
-      # --- END NEW STEP ---
+        run: echo "RELEASE_TAG=v${{ env.PACKAGE_VERSION }}-${{ github.sha }}" >> $GITHUB_ENV
 
 
       - name: Create GitHub Release
-        # 🚨 FIX: We remove the 'if' condition and use 'tag_name' property to create the release
         uses: softprops/action-gh-release@v1
         with:
-          # Use the dynamically generated tag name
           tag_name: ${{ env.RELEASE_TAG }} 
-          # The target is the commit SHA that triggered the workflow
           target_commitish: ${{ github.sha }}
-          # Set the release as a draft until a proper version number is ready
           draft: true
-          # The name of the release in the UI
-          name: Automated Build (${{ env.RELEASE_TAG }})
+          name: Remote-Control Release v${{ env.PACKAGE_VERSION }}
           body: |
-            Automated build for commit ${{ github.sha }}.
+            Automated build for version v${{ env.PACKAGE_VERSION }} (commit ${{ github.sha }}).
             
             This release contains the Linux and Windows executables bundled with the 'public' assets.
           files: |
