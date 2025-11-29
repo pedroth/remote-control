@@ -17,6 +17,12 @@ jobs:
 
       - name: Install JQ
         run: sudo apt-get update && sudo apt-get install -y jq
+      
+      - name: Install Native Build Prerequisites (for robotjs)
+        run: |
+          sudo apt-get update
+          # build-essential for C++ compilation; libxtst-dev for X11/robot support
+          sudo apt-get install -y build-essential libxtst-dev
 
 
       - name: Set up Bun
@@ -60,7 +66,6 @@ jobs:
           cd ../release-win && zip -r ../remote-control-win.zip .
 
 
-      # --- NEW STEP TO GENERATE TAG AND SET AS ENV VAR ---
       - name: Set dynamic tag name
         id: tag_name_step
         run: echo "RELEASE_TAG=v${{ env.PACKAGE_VERSION }}-${{ github.sha }}" >> $GITHUB_ENV
@@ -69,8 +74,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          # Use the dynamically generated tag name
           tag_name: ${{ env.RELEASE_TAG }} 
+          # The target is the commit SHA that triggered the workflow
           target_commitish: ${{ github.sha }}
+          # Set the release as a draft until a proper version number is ready
           draft: true
           name: Remote-Control Release v${{ env.PACKAGE_VERSION }}
           body: |
