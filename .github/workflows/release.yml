@@ -30,17 +30,16 @@ jobs:
         run: bun run build-windows
 
 
-      # Assumes build-linux and build-windows output executables named as below
-
-
       - name: Prepare release folders
         run: |
           mkdir -p release-linux
           mkdir -p release-win
           cp -r public release-linux/
           cp -r public release-win/
-          mv remote-control-server-linux release-linux/
-          mv remote-control-server-win.exe release-win/
+          
+          # FIX: Use the exact executable names from package.json scripts
+          mv remote-control-server release-linux/
+          mv remote-control-server.exe release-win/
 
 
       - name: Create zip files
