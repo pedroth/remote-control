@@ -10,6 +10,8 @@ Remote control your computer using the remote-control server. This server enable
 2. git clone this repository.
 3. Navigate to the project directory.
 4. Run `bun install` to install dependencies.
+5. Mobile Setup:
+    - Ensure your mobile device is connected to the same network as the server.
 5. Start the server:
     - For HTTP: `bun server.mjs`
     - For HTTPS with self-signed certificates: `bun server.mjs -s`

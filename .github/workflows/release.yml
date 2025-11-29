@@ -1,0 +1,59 @@
+name: Release Build and Assets
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+
+      - name: Install dependencies
+        run: bun install
+
+
+      - name: Build Linux executable
+        run: bun run build-linux
+
+      - name: Build Windows executable
+        run: bun run build-windows
+
+
+      # Assumes build-linux and build-windows output executables named as below
+
+
+      - name: Prepare release folders
+        run: |
+          mkdir -p release-linux
+          mkdir -p release-win
+          cp -r public release-linux/
+          cp -r public release-win/
+          mv remote-control-server-linux release-linux/
+          mv remote-control-server-win.exe release-win/
+
+
+      - name: Create zip files
+        run: |
+          cd release-linux && zip -r ../remote-control-linux.zip .
+          cd ../release-win && zip -r ../remote-control-win.zip .
+
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            remote-control-linux.zip
+            remote-control-win.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

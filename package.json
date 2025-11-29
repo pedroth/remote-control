@@ -1,7 +1,9 @@
 {
   "name": "remote-control",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
+    "start": "bun run ./server.mjs",
     "build-windows": "bun build --compile --target=bun-windows-x64 ./server.mjs --outfile remote-control-server.exe",
     "build-linux": "bun build --compile --target=bun-linux-x64 ./server.mjs --outfile remote-control-server"
   },
