@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-    tags: # 🚨 NEW: Trigger the workflow when a tag is pushed
-      - 'v*' # Runs on any tag starting with 'v', like v1.0, v1.2.3
+    # Removed 'tags:' trigger because the job itself will now create the tag.
 
 jobs:
   build-and-zip:
@@ -52,11 +51,29 @@ jobs:
           cd ../release-win && zip -r ../remote-control-win.zip .
 
 
+      # --- NEW STEP TO GENERATE TAG AND SET AS ENV VAR ---
+      - name: Set dynamic tag name
+        id: tag_name_step
+        run: echo "RELEASE_TAG=build-${{ github.sha }}" >> $GITHUB_ENV
+      # --- END NEW STEP ---
+
+
       - name: Create GitHub Release
-        # 🚨 FIX: Only run this step if the workflow was triggered by a tag push
-        if: startsWith(github.ref, 'refs/tags/') 
+        # 🚨 FIX: We remove the 'if' condition and use 'tag_name' property to create the release
         uses: softprops/action-gh-release@v1
         with:
+          # Use the dynamically generated tag name
+          tag_name: ${{ env.RELEASE_TAG }} 
+          # The target is the commit SHA that triggered the workflow
+          target_commitish: ${{ github.sha }}
+          # Set the release as a draft until a proper version number is ready
+          draft: true
+          # The name of the release in the UI
+          name: Automated Build (${{ env.RELEASE_TAG }})
+          body: |
+            Automated build for commit ${{ github.sha }}.
+            
+            This release contains the Linux and Windows executables bundled with the 'public' assets.
           files: |
             remote-control-linux.zip
             remote-control-win.zip
