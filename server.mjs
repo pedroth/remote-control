@@ -1,15 +1,13 @@
-
-import express from 'express';
-import { createServer } from 'https';
-import { readFileSync } from 'fs';
-import open from 'open';
-import ip from 'ip';
-import path from 'path';
-import robot from '@jitsi/robotjs';
+import express from "express";
+import { createServer } from "https";
+import { readFileSync } from "fs";
+import open from "open";
+import ip from "ip";
+import path from "path";
+import robot from "@jitsi/robotjs";
 import { cwd } from "process";
-import { WebSocketServer } from 'ws';
-import { $ } from 'bun';
-
+import { WebSocketServer } from "ws";
+import { $ } from "bun";
 
 class mySocket {
     constructor(httpsServer) {
@@ -23,37 +21,33 @@ class mySocket {
     }
 
     init() {
-        this.wss.on('connection', (ws) => {
+        this.wss.on("connection", (ws) => {
             this.setupListeners(ws);
         });
     }
 
     setupListeners(ws) {
-        ws.on('message', async (msg) => {
+        ws.on("message", async (msg) => {
             let parsed;
             try {
                 parsed = JSON.parse(msg);
             } catch (e) {
-                console.error('Invalid message:', msg);
+                console.error("Invalid message:", msg);
                 return;
             }
             const { event, data } = parsed;
             if (this.eventMap.has(event)) {
                 this.eventMap.get(event)(data);
             } else {
-                console.log('Unknown event:', event);
+                console.log("Unknown event:", event);
             }
         });
     }
-
-
 }
 
 // main server logic
 (async () => {
-
-    // check args, if -s is provided, use https
-    const isSelfSigned = process.argv.includes('-s');
+    const isSelfSigned = process.argv.includes("-s");
     if (isSelfSigned) {
         console.log("Using self-signed certificates for HTTPS.");
 
@@ -82,73 +76,95 @@ class mySocket {
     }
 
     const app = express();
-    const httpsOptions = isSelfSigned ? {
-        key: readFileSync('key.pem'),
-        cert: readFileSync('cert.pem')
-    } : {};
+    const httpsOptions = isSelfSigned
+        ? {
+                key: readFileSync("key.pem"),
+                cert: readFileSync("cert.pem"),
+            }
+        : {};
 
     const httpServer = createServer(httpsOptions, app);
     const wss = new mySocket(httpServer);
 
     const PORT = 3000;
     const LOCAL_IP = ip.address();
-
-
-    // Get current file directory in any environment
     const __dirname = cwd();
-    const PUBLIC_DIR = path.join(__dirname, 'public');
+    const PUBLIC_DIR = path.join(__dirname, "public");
 
     app.use(express.static(PUBLIC_DIR));
 
-    app.get('/config', (req, res) => {
-        // 4. Update protocol to HTTPS
+    app.get("/config", (req, res) => {
         res.json({
-            hostUrl: `http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/index.html`
+            hostUrl: `http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/index.html`,
         });
     });
 
-
-    wss.on('cmd_goto', async (data) => {
-        let url = data;
-        await open(url);
+    wss.on("cmd_goto", async (data) => {
+        await open(data);
     });
-    wss.on('cmd_mouse_move', async (data) => {
+
+    wss.on("cmd_mouse_move", async (data) => {
         try {
             const mouse = robot.getMousePos();
             const speed = 2.0;
-            robot.moveMouse(mouse.x + (data.x * speed), mouse.y + (data.y * speed));
-        } catch (e) { }
+            robot.moveMouse(mouse.x + data.x * speed, mouse.y + data.y * speed);
+        } catch (e) {}
     });
-    wss.on('cmd_mouse_click', async (data) => {
-        try { robot.mouseClick(data); } catch (e) { }
+
+    wss.on("cmd_mouse_click", async (data) => {
+        try {
+            robot.mouseClick(data);
+        } catch (e) {
+            console.error(e);
+        }
     });
-    wss.on('cmd_mouse_down', async (data) => {
-        try { robot.mouseToggle('down', data); } catch (e) { }
+
+    wss.on("cmd_mouse_down", async (data) => {
+        try {
+            robot.mouseToggle("down", data);
+        } catch (e) {
+            console.error(e);
+        }
     });
-    wss.on('cmd_mouse_up', async (data) => {
-        try { robot.mouseToggle('up', data); } catch (e) { }
+
+    wss.on("cmd_mouse_up", async (data) => {
+        try {
+            robot.mouseToggle("up", data);
+        } catch (e) {
+            console.error(e);
+        }
     });
-    wss.on('cmd_type', async (data) => {
-        try { robot.typeString(data); } catch (e) { }
+
+    wss.on("cmd_type", async (data) => {
+        try {
+            robot.typeString(data);
+        } catch (e) {
+            console.error(e);
+        }
     });
-    wss.on('cmd_scroll', async (data) => {
+
+    wss.on("cmd_scroll", async (data) => {
         try {
             const speed = 1;
             robot.scrollMouse(0, data.amount * speed);
-        } catch (e) { }
+        } catch (e) {
+            console.error(e);
+        }
     });
-    wss.on('cmd_key_tap', (key) => {
+
+    wss.on("cmd_key_tap", (key) => {
         try {
             robot.keyTap(key);
         } catch (e) {
             console.error(e);
         }
     });
+
     wss.init();
 
     httpServer.listen(PORT, () => {
-        console.log(`Address: http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
-        // launch browser automatically
-        open(`http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/qr.html`);
+        const protocol = isSelfSigned ? "https" : "http";
+        console.log(`Address: ${protocol}://${LOCAL_IP}:${PORT}/qr.html`);
+        open(`${protocol}://${LOCAL_IP}:${PORT}/qr.html`);
     });
-})()
+})();
