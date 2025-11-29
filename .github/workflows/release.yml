@@ -1,0 +1,162 @@
+name: Release Build and Assets (Non-Compiled Distribution)
+
+on:
+  push:
+    branches:
+      - main
+      
+jobs:
+  build-and-package:
+    # Use a matrix to package for both Linux and Windows in one job (more efficient)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        target: [linux, win]
+        include:
+          - os: ubuntu-latest
+            target: linux
+            filename: remote-control-linux.zip
+            run_script: run-linux.sh
+          - os: windows-latest
+            target: win
+            filename: remote-control-win.zip
+            run_script: run-win.cmd
+
+    runs-on: ${{ matrix.os }}
+    
+    permissions:
+      contents: write # Required for creating tags and releases
+
+    # The NODE_BINDINGS_DYN_BUNDLE environment variable is no longer necessary
+    # since we are not using bun --compile.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install JQ (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      # --- Build Step: Install Dependencies for Target OS ---
+      # This ensures native modules like robotjs are built for the current OS.
+      - name: Install dependencies
+        run: bun install
+      # ------------------------------------------------------
+        
+      # --- Metadata Steps ---
+      - name: Extract package version (Linux)
+        if: runner.os == 'Linux'
+        id: package_version_step
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' package.json)" >> $GITHUB_ENV
+
+      - name: Extract package version (Windows fallback)
+        if: runner.os == 'Windows'
+        id: package_version_step_win
+        # PowerShell command to extract version
+        run: echo "PACKAGE_VERSION=$(Get-Content package.json | ConvertFrom-Json).version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      # ----------------------
+
+      # --- Packaging Steps ---
+      - name: Create Distribution Folder
+        id: package
+        run: |
+          $dir_name = "remote-control-${{ matrix.target }}"
+          mkdir $dir_name
+          
+          # Copy essential files
+          cp server.mjs $dir_name/
+          cp package.json $dir_name/
+          cp -r public $dir_name/
+          
+          # Copy node_modules (required for robotjs)
+          cp -r node_modules $dir_name/
+
+      - name: Create Start Script (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo '#!/bin/bash' > remote-control-linux/run-linux.sh
+          echo 'echo "Starting Remote Control Server with Bun..."' >> remote-control-linux/run-linux.sh
+          # Use bun run, assuming Bun is installed on the user's system (or they use Node)
+          echo 'bun run ./server.mjs' >> remote-control-linux/run-linux.sh
+          chmod +x remote-control-linux/run-linux.sh
+
+      - name: Create Start Script (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo '@echo off' > remote-control-win/run-win.cmd
+          echo 'echo Starting Remote Control Server with Bun...' >> remote-control-win/run-win.cmd
+          echo 'bun run server.mjs' >> remote-control-win/run-win.cmd
+
+      - name: Create zip file
+        if: runner.os == 'Linux'
+        run: zip -r ${{ matrix.filename }} remote-control-linux
+
+      - name: Create zip file (Windows)
+        if: runner.os == 'Windows'
+        # Uses 7zip which is pre-installed on Windows runners
+        run: 7z a -tzip ${{ matrix.filename }} remote-control-win
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.filename }}
+          path: ${{ matrix.filename }}
+
+  # The release job now runs *after* the packaging is complete
+  create-release:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    
+    # We only need one instance of this job to run once all packages are ready
+    if: success() && github.ref == 'refs/heads/main' 
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install JQ
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Extract package version
+        id: package_version_step
+        run: echo "PACKAGE_VERSION=$(jq -r '.version' package.json)" >> $GITHUB_ENV
+      
+      - name: Set dynamic tag name
+        id: tag_name_step
+        run: echo "RELEASE_TAG=v${{ env.PACKAGE_VERSION }}-${{ github.sha }}" >> $GITHUB_ENV
+        
+      - name: Download all packages
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.RELEASE_TAG }} 
+          target_commitish: ${{ github.sha }}
+          draft: true
+          name: Remote-Control Release v${{ env.PACKAGE_VERSION }}
+          body: |
+            Automated distribution package for version v${{ env.PACKAGE_VERSION }} (commit ${{ github.sha }}).
+            
+            This release contains the Linux and Windows distribution packages.
+            
+            **Installation Instructions:**
+            1. Unzip the file for your platform.
+            2. Ensure you have Bun or Node.js installed.
+            3. Run the appropriate start script:
+               - Linux: `./run-linux.sh`
+               - Windows: `run-win.cmd`
+          files: artifacts/*/*.zip # Upload all downloaded zips from the artifacts directory
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
