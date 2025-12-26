@@ -32,15 +32,19 @@
         const textInput = DomBuilder.of("input")
             .attr("type", "text")
             .attr("placeholder", "Type text...")
+            .event("input", (e) => {
+                const val = e.target.value;
+                if (val) {
+                    sendType(val); // Send the actual character/string
+                    e.target.value = ''; // Clear immediately without setTimeout
+                }
+            })
             .event("keydown", (e) => {
-                console.log("!!!!", e.key);
+                console.log("!!!!", e.key, e);
                 if (e.key === "Enter") {
                     sendKey("enter");
                 } else if (e.key === "Backspace") {
                     sendKey("backspace");
-                } else {
-                    sendType(textInput.element.value);
-                    textInput.element.value = '';
                 }
             });
 
@@ -188,7 +192,7 @@
         function sendType(val) {
             emit('cmd_type', val);
         }
-        
+
         function sendKey(val) {
             emit('cmd_key_tap', val);
         }

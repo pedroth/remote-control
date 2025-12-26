@@ -86,7 +86,7 @@ class mySocket {
     const httpServer = createServer(httpsOptions, app);
     const wss = new mySocket(httpServer);
 
-    const PORT = 3000;
+    let PORT = 3000;
     const LOCAL_IP = ip.address();
     const __dirname = cwd();
     const PUBLIC_DIR = path.join(__dirname, "public");
@@ -95,7 +95,7 @@ class mySocket {
 
     app.get("/config", (req, res) => {
         res.json({
-            hostUrl: `http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${PORT}/index.html`,
+            hostUrl: `http${isSelfSigned ? "s" : ""}://${LOCAL_IP}:${availablePort}/index.html`,
         });
     });
 
@@ -137,6 +137,7 @@ class mySocket {
 
     wss.on("cmd_type", async (data) => {
         try {
+            console.log("Typing:", data);
             robot.typeString(data);
         } catch (e) {
             console.error(e);
@@ -154,6 +155,7 @@ class mySocket {
 
     wss.on("cmd_key_tap", (key) => {
         try {
+            console.log("Key tap:", key);
             robot.keyTap(key);
         } catch (e) {
             console.error(e);
@@ -162,9 +164,39 @@ class mySocket {
 
     wss.init();
 
-    httpServer.listen(PORT, () => {
+    // Function to find an available port
+    const findAvailablePort = (startPort) => {
+        return new Promise((resolve) => {
+            const tryPort = (port) => {
+                const server = createServer(httpsOptions, app);
+                server.listen(port, () => {
+                    console.log(`✓ Port ${port} is available`);
+                    server.close(() => {
+                        resolve(port);
+                    });
+                }).on("error", (err) => {
+                    if (err.code === "EADDRINUSE") {
+                        console.log(`✗ Port ${port} is in use, trying port ${port + 1}...`);
+                        tryPort(port + 1);
+                    } else {
+                        console.error("Server error:", err);
+                    }
+                });
+            };
+            tryPort(startPort);
+        });
+    };
+
+    const availablePort = await findAvailablePort(PORT);
+    console.log(`Starting server on port ${availablePort}...`);
+
+    httpServer.listen(availablePort, () => {
         const protocol = isSelfSigned ? "https" : "http";
-        console.log(`Address: ${protocol}://${LOCAL_IP}:${PORT}/qr.html`);
-        open(`${protocol}://${LOCAL_IP}:${PORT}/qr.html`);
+        console.log(`✓ Server started successfully!`);
+        console.log(`Address: ${protocol}://${LOCAL_IP}:${availablePort}/qr.html`);
+        open(`${protocol}://${LOCAL_IP}:${availablePort}/qr.html`);
+    }).on("error", (err) => {
+        console.error(`✗ Failed to start server on port ${availablePort}:`, err.message);
+        process.exit(1);
     });
 })();
