@@ -4,6 +4,8 @@
 
 Remote control your computer using the remote-control server. This server enables you to control your computer from your phone. The project was initially created to control a Raspberry Pi connected to a TV via mobile device.
 
+![Remote Control Demo](./remote-control.webp)
+
 ## Usage
 
 1. Install [bun.js](https://bun.sh/) if you haven't already.
