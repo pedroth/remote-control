@@ -25,5 +25,13 @@ Remote control your computer using the remote-control server. This server enable
 
 - For Windows: `bun run build-windows`
 - For Linux: `bun run build-linux`
-- For macOS: `bun run build-macos`## Debug 
+- For macOS: `bun run build-macos`
+
+## GitHub Releases
+
+Each push to `main`, including merges, triggers GitHub Actions to build release bundles for Linux, macOS, and Windows.
+
+- Release tags and release names use the version from `package.json`, for example `v0.0.11`.
+- Assets are published as platform-specific archives containing the executable and the required `public/` files.
+
 
