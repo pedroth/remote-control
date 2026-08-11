@@ -8,6 +8,17 @@ Remote control your computer using the remote-control server. This server enable
 
 ## Usage
 
+### Github releases
+
+- Download the latest release for your platform from the [releases page](https://github.com/pedroth/remote-control/releases).
+- Extract the archive to a folder of your choice.
+- Run the executable:
+    - linux: `./remote-control-server`
+    - macos: `./remote-control-server`
+    - windows: `remote-control-server.exe`
+
+### From source
+
 1. Install [bun.js](https://bun.sh/) if you haven't already.
 2. git clone this repository.
 3. Navigate to the project directory.
@@ -21,11 +32,6 @@ Remote control your computer using the remote-control server. This server enable
 7. Scan it with your mobile device to access the remote control UI.
 8. To enable the mobile debug console on the controller page, open the URL with `?debug`, for example `http://<server-ip>:3000/index.html?debug`.
 
-## Building executables
-
-- For Windows: `bun run build-windows`
-- For Linux: `bun run build-linux`
-- For macOS: `bun run build-macos`
 
 ## GitHub Releases
 

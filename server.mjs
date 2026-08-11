@@ -4,10 +4,36 @@ import { existsSync, readFileSync } from "fs";
 import open from "open";
 import ip from "ip";
 import path from "path";
-import robot from "@jitsi/robotjs";
 import { cwd } from "process";
 import { WebSocketServer } from "ws";
 import { $ } from "bun";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+
+function loadRobotJs() {
+    const runtimeNodeModulesPaths = [
+        path.join(cwd(), "node_modules"),
+        path.join(path.dirname(process.execPath), "node_modules"),
+    ];
+
+    for (const nodeModulesPath of runtimeNodeModulesPaths) {
+        const robotJsPath = path.join(nodeModulesPath, "@jitsi", "robotjs");
+        if (!existsSync(robotJsPath)) {
+            continue;
+        }
+
+        try {
+            return require(robotJsPath);
+        } catch (e) {
+            console.warn("Failed to load RobotJS from", robotJsPath, e?.message ?? e);
+        }
+    }
+
+    return require("@jitsi/robotjs");
+}
+
+const robot = loadRobotJs();
 
 class mySocket {
     constructor(httpsServer) {

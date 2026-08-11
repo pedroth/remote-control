@@ -73,24 +73,33 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p dist/remote-control-linux-x64/public
+          mkdir -p dist/remote-control-linux-x64/node_modules/@jitsi
           mv remote-control-server dist/remote-control-linux-x64/remote-control-server
           cp -R public/. dist/remote-control-linux-x64/public/
+          cp -R node_modules/@jitsi/robotjs dist/remote-control-linux-x64/node_modules/@jitsi/
+          cp -R node_modules/node-gyp-build dist/remote-control-linux-x64/node_modules/
           tar -czf ${{ matrix.archive_name }} -C dist remote-control-linux-x64
 
       - name: Package macOS release
         if: runner.os == 'macOS'
         run: |
           mkdir -p dist/remote-control-macos-x64/public
+          mkdir -p dist/remote-control-macos-x64/node_modules/@jitsi
           mv remote-control-server dist/remote-control-macos-x64/remote-control-server
           cp -R public/. dist/remote-control-macos-x64/public/
+          cp -R node_modules/@jitsi/robotjs dist/remote-control-macos-x64/node_modules/@jitsi/
+          cp -R node_modules/node-gyp-build dist/remote-control-macos-x64/node_modules/
           tar -czf ${{ matrix.archive_name }} -C dist remote-control-macos-x64
 
       - name: Package Windows release
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory -Path dist/remote-control-windows-x64/public -Force | Out-Null
+          New-Item -ItemType Directory -Path dist/remote-control-windows-x64/node_modules/@jitsi -Force | Out-Null
           Move-Item -Path remote-control-server.exe -Destination dist/remote-control-windows-x64/remote-control-server.exe
           Copy-Item -Path public\* -Destination dist/remote-control-windows-x64/public -Recurse
+          Copy-Item -Path node_modules/@jitsi/robotjs -Destination dist/remote-control-windows-x64/node_modules/@jitsi -Recurse
+          Copy-Item -Path node_modules/node-gyp-build -Destination dist/remote-control-windows-x64/node_modules -Recurse
           Compress-Archive -Path dist/remote-control-windows-x64\* -DestinationPath ${{ matrix.archive_name }}
         shell: pwsh
 
