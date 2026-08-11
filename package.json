@@ -11,13 +11,13 @@
     "build-macos": "bun build --compile --target=bun-macos-x64 ./server.mjs --outfile remote-control-server"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@jitsi/robotjs": "^0.6.11",
-    "express": "^4.18.2",
-    "ip": "^1.1.8",
+    "@jitsi/robotjs": "^0.6.24",
+    "express": "^4.22.2",
+    "ip": "^1.1.9",
     "open": "^9.1.0",
-    "ws": "^8.16.0"
+    "ws": "^8.21.3"
   }
 }
