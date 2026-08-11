@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer } from "https";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import open from "open";
 import ip from "ip";
 import path from "path";
@@ -88,8 +88,11 @@ class mySocket {
 
     let PORT = 3000;
     const LOCAL_IP = ip.address();
-    const __dirname = cwd();
-    const PUBLIC_DIR = path.join(__dirname, "public");
+    const PUBLIC_DIR_CANDIDATES = [
+        path.join(cwd(), "public"),
+        path.join(path.dirname(process.execPath), "public"),
+    ];
+    const PUBLIC_DIR = PUBLIC_DIR_CANDIDATES.find((dir) => existsSync(dir)) ?? PUBLIC_DIR_CANDIDATES[0];
 
     app.use(express.static(PUBLIC_DIR));
 

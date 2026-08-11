@@ -19,5 +19,11 @@ Remote control your computer using the remote-control server. This server enable
     - For HTTPS with self-signed certificates: `bun server.mjs -s`
 6. The default browser will open with a QR code.
 7. Scan it with your mobile device to access the remote control UI.
+8. To enable the mobile debug console on the controller page, open the URL with `?debug`, for example `http://<server-ip>:3000/index.html?debug`.
 
+## Building executables
+
+- For Windows: `bun run build-windows`
+- For Linux: `bun run build-linux`
+- For macOS: `bun run build-macos`## Debug 
 
