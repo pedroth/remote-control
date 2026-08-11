@@ -34,4 +34,4 @@ Each push to `main`, including merges, triggers GitHub Actions to build release 
 - Release tags and release names use the version from `package.json`, for example `v0.0.11`.
 - Assets are published as platform-specific archives containing the executable and the required `public/` files.
 
-
+> Before merging to `main`, do `bun run pub`, to update package.json and package-lock.json with the new version. The GitHub Actions workflow will then use this version to create the release.
