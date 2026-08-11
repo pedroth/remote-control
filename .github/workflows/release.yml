@@ -32,10 +32,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Bun
+      - name: Set up Bun on Linux and Windows
+        if: runner.os != 'macOS'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Set up Bun on macOS
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          installed=false
+          for attempt in 1 2 3; do
+            if curl --retry 5 --retry-all-errors --fail --silent --show-error https://bun.sh/install -o bun-install.sh && bash bun-install.sh; then
+              installed=true
+              break
+            fi
+            rm -f bun-install.sh
+            echo "Bun install attempt ${attempt} failed, retrying..."
+          done
+
+          if [ "$installed" != true ]; then
+            echo "Failed to install Bun on macOS after 3 attempts" >&2
+            exit 1
+          fi
+
+          rm -f bun-install.sh
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Bun installation
+        run: bun --version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
